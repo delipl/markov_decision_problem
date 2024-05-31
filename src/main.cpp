@@ -9,10 +9,10 @@ struct StateData {
   std::vector<double> utilities;
 };
 
-int main() {
+int main(int argc, char *argv[]) {
   DataLoader dataLoader;
   try {
-    dataLoader.load("data.txt"); // Replace with your actual data file path
+    dataLoader.load(argv[1]); // Replace with your actual data file path
     dataLoader.printData();
   } catch (const std::runtime_error &e) {
     std::cerr << e.what() << std::endl;
@@ -21,20 +21,21 @@ int main() {
 
   const auto probabilities = dataLoader.getProbabilities();
   const auto gamma = dataLoader.getGamma();
+  const auto epsilon = dataLoader.getEpsilon();
 
   World world(dataLoader);
 
   world.printWorld();
 
-  for (int i = 0; i < 100; ++i) {
-    world.valueIteration(gamma, 0.0001);
+  for (int i = 0; i < 20; ++i) {
+    world.valueIteration(gamma, epsilon);
+  world.printWorld();
 
-    std::cout << "========================[V(" << i
-              << ")]========================" << std::endl;
-    world.printWorld();
+    // std::cout << "========================[V(" << i
+    //           << ")]========================" << std::endl;
   }
+  world.printWorld();
 
-    world.getMaxQValue(3, 3);
   //   world.valueIteration(gamma, 0.0001);
 
   //   std::cout << "========================[V(" << i
