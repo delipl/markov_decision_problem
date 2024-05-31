@@ -2,15 +2,15 @@
 #define WORLD_HPP
 
 #include "DataLoader.hpp"
-#include "Policy.hpp"
 #include <iomanip> // for std::setw
 #include <vector>
+#include "Policy.hpp"
 
 struct State {
   float value;
-  char type;
+  char policy;
   float reward;
-  Policy policy;
+  // Policy policy;
 };
 
 class World {
@@ -23,15 +23,13 @@ public:
   void updatePolicy(int x, int y,
                     char policy);     // Update the policy of a specific state
   float getValue(int x, int y) const; // Get the value of a specific state
-  char getType(int x, int y) const; // Get the policy of a specific state
+  char getPolicy(int x, int y) const; // Get the policy of a specific state
   int getWidth() const { return width; }
   int getHeight() const { return width; }
 
   void valueIteration(float gamma, float epsilon);
-  float getMaxQValue(int x, int y);
+  float getMaxQValue(int x, int y) const;
 
-  State &getState(int x, int y);
-  // void UpdateState(int x, int y, State state) { grid[x][y] = state; }
 
 private:
   int width;
