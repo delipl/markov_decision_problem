@@ -7,10 +7,13 @@
 #include <vector>
 
 struct State {
-  float value;
+  float utility;
   char type;
   float reward;
   char policy;
+  std::map<char, uint32_t> visits;
+  std::map<char, float> q;
+  // std::pair<char, std::vector<std::array<int, 2>>> policies;
 };
 
 class World {
@@ -18,11 +21,11 @@ public:
   World(const DataLoader &dataLoader);
 
   void printWorld() const;
-  void updateValue(int x, int y,
-                   float value); // Update the value of a specific state
+  void updateUtility(int x, int y,
+                   float utility); // Update the utility of a specific state
   void updateType(int x, int y,
                   char policy);       // Update the policy of a specific state
-  float getValue(int x, int y) const; // Get the value of a specific state
+  float getValue(int x, int y) const; // Get the utility of a specific state
   char getType(int x, int y) const;   // Get the policy of a specific state
   int getWidth() const { return width; }
   int getHeight() const { return width; }
@@ -30,9 +33,17 @@ public:
   void valueIteration(float gamma, float epsilon);
   float getMaxQValue(int x, int y);
   void updatePolicy(int x, int y,
-                    char value); // Update the value of a specific state
+                    char utility); // Update the utility of a specific state
   char getPolicy(int x, int y) const;
   float getReward(int x, int y) const;
+  void addVisit(int x, int y, char action);
+  uint32_t getVisits(int x, int y, char action) const;
+  void QLearning();
+
+  float getQValue(int x, int y, char action);
+  void updateQValue(int x, int y, char action, float value);
+
+  std::pair<int, int> getStart();
 
 private:
   int width;
@@ -45,7 +56,12 @@ private:
   bool startStateSet;
   float reward;
   float gamma;
-  float probabilities[3]; void initializeGrid();
+  float probabilities[3];
+  void initializeGrid();
+
+  std::pair<char, std::vector<std::array<int, 2>>> getRandomAction(int x,
+                                                                   int y);
+  std::pair<int, int> execute_action(int start_x, int start_y, char action);
 };
 
 #endif // WORLD_HPP

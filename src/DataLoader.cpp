@@ -49,7 +49,7 @@ void DataLoader::parseLine(const std::string& line) {
             throw std::runtime_error("Invalid format for gamma");
         }
         if (gamma <= 0.0f || gamma > 1.0f) {
-            throw std::runtime_error("Invalid gamma value");
+            throw std::runtime_error("Invalid gamma utility");
         }
         gammaSet = true;
     } else if (label == "E") {

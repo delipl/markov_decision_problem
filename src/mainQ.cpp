@@ -11,7 +11,7 @@ struct StateData {
 
 int main(int argc, char *argv[]) {
 
-  if(argc == 1){
+  if (argc == 1) {
     std::cerr << "Add argument data path!" << std::endl;
     return -1;
   }
@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     std::cerr << e.what() << std::endl;
     return 1;
   }
-
+  std::srand(std::time(nullptr)); 
   const auto probabilities = dataLoader.getProbabilities();
   const auto gamma = dataLoader.getGamma();
   const auto epsilon = dataLoader.getEpsilon();
@@ -32,20 +32,13 @@ int main(int argc, char *argv[]) {
 
   world.printWorld();
 
-  for (int i = 0; i < 20; ++i) {
-    world.valueIteration(gamma, epsilon);
-  world.printWorld();
+  for (int i = 0; i < 1; ++i) {
+    world.QLearning();
 
-    // std::cout << "========================[V(" << i
-    //           << ")]========================" << std::endl;
+    world.printWorld();
+
   }
   world.printWorld();
-
-  //   world.valueIteration(gamma, 0.0001);
-
-  //   std::cout << "========================[V(" << i
-  //             << ")]========================" << std::endl;
-  //   world.printWorld();
 
   return 0;
 }

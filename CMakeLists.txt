@@ -15,5 +15,13 @@ add_executable(DataLoader
     src/Policy.cpp
 )
 
+add_executable(QLearning
+    src/mainQ.cpp
+    src/DataLoader.cpp
+    src/World.cpp
+    src/Policy.cpp
+)
+
 # Include the header files
 target_include_directories(DataLoader PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(QLearning PUBLIC ${PROJECT_SOURCE_DIR}/include)

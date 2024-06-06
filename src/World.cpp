@@ -33,7 +33,16 @@ World::World(const DataLoader &dataLoader) {
 }
 
 void World::initializeGrid() {
-  grid.resize(height, std::vector<State>(width, {0.0f, ' ', reward}));
+  grid.resize(height,
+              std::vector<State>(
+                  width, {
+                             0.0f,
+                             ' ',
+                             reward,
+                             ' ',
+                             {{'^', 0}, {'v', 0}, {'<', 0}, {'>', 0}},
+                             {{'^', 0.0}, {'v', 0.0}, {'<', 0.0}, {'>', 0.0}},
+                         }));
 
   for (const auto &ts : terminalStates) {
     grid[ts.y - 1][ts.x - 1] = {ts.reward, 'T', ts.reward, ' '};
@@ -74,7 +83,7 @@ void World::printWorld() const {
 
     for (int x = 0; x < width; ++x) {
       std::cout << "  | " << grid[y][x].policy << std::setw(8) << std::fixed
-                << std::setprecision(4) << grid[y][x].value;
+                << std::setprecision(4) << grid[y][x].utility;
     }
     std::cout << "|" << std::endl;
 
@@ -90,9 +99,9 @@ void World::printWorld() const {
   std::cout << std::endl;
 }
 
-void World::updateValue(int x, int y, float value) {
+void World::updateUtility(int x, int y, float utility) {
   if (x >= 1 && x <= width && y >= 1 && y <= height) {
-    grid[y - 1][x - 1].value = value;
+    grid[y - 1][x - 1].utility = utility;
   } else {
     throw std::out_of_range("Coordinates out of range");
   }
@@ -108,7 +117,7 @@ void World::updateType(int x, int y, char policy) {
 
 float World::getValue(int x, int y) const {
   if (x >= 1 && x <= width && y >= 1 && y <= height) {
-    return grid[y - 1][x - 1].value;
+    return grid[y - 1][x - 1].utility;
   } else {
     // throw std::out_of_range("Coordinates out of range");
     std::cerr << "Coordinates out of range" << std::endl;
@@ -124,9 +133,9 @@ char World::getType(int x, int y) const {
   }
 }
 
-void World::updatePolicy(int x, int y, char value) {
+void World::updatePolicy(int x, int y, char utility) {
   if (x >= 1 && x <= width && y >= 1 && y <= height) {
-    grid[y - 1][x - 1].policy = value;
+    grid[y - 1][x - 1].policy = utility;
   } else {
     throw std::out_of_range("Coordinates out of range");
   }
@@ -147,6 +156,22 @@ float World::getReward(int x, int y) const {
   }
 }
 
+void World::addVisit(int x, int y, char action) {
+  if (x >= 1 && x <= width && y >= 1 && y <= height) {
+    grid[y - 1][x - 1].visits.at(action)++;
+  } else {
+    throw std::out_of_range("Coordinates out of range");
+  }
+}
+
+uint32_t World::getVisits(int x, int y, char action) const {
+  if (x >= 1 && x <= width && y >= 1 && y <= height) {
+    return grid[y - 1][x - 1].visits.at(action);
+  } else {
+    throw std::out_of_range("Coordinates out of range");
+  }
+}
+
 void World::valueIteration(float gamma, float epsilon) {
   this->gamma = gamma;
   bool stop_condition = false;
@@ -158,9 +183,9 @@ void World::valueIteration(float gamma, float epsilon) {
       for (int x = 1; x <= width; ++x) {
         auto &state = grid[y - 1][x - 1];
         if (state.type != 'T' && state.type != 'F') {
-          float oldValue = state.value;
+          float oldValue = state.utility;
           float newValue = getMaxQValue(x, y);
-          state.value = newValue;
+          state.utility = newValue;
           float utility_delta = std::abs(newValue - oldValue);
           if (utility_delta > epsilon) {
             max_delta = utility_delta;
@@ -249,4 +274,136 @@ float World::getMaxQValue(int x, int y) {
   updatePolicy(x, y, max_policy);
 
   return getReward(x, y) + max_utility;
+}
+
+float World::getQValue(int x, int y, char action) {
+
+  if (x >= 1 && x <= width && y >= 1 && y <= height) {
+    return grid[y - 1][x - 1].q.at(action);
+  } else {
+    throw std::out_of_range("Coordinates out of range");
+  }
+}
+
+void World::updateQValue(int x, int y, char action, float value) {
+  if (x >= 1 && x <= width && y >= 1 && y <= height) {
+    grid[y - 1][x - 1].q.at(action) = value;
+  } else {
+    throw std::out_of_range("Coordinates out of range");
+  }
+}
+
+std::pair<int, int> World::getStart() {
+  for (int i = 1; i <= width; ++i) {
+    for (int j = 1; j <= height; ++j) {
+      if (getType(i, j) == 'S') {
+        return {i, j};
+      }
+    }
+  }
+  return {-1, -1};
+}
+
+void World::QLearning() {
+
+  for (int i = 0; i < 100; ++i) {
+    auto [start_x, start_y] = getStart();
+    int x = start_x;
+    int y = start_y;
+    std::cout << "Iteration " << i << std::endl;
+    while (getType(x, y) != 'T') {
+      auto action = getRandomAction(x, y);
+      // std::cout << "at (" << x << "," << y << ") " << std::endl;
+      auto [new_x, new_y] = execute_action(x, y, action.first);
+      // std::cout << "looking at (" << new_x << "," << new_y << ")" << std::endl;
+
+      addVisit(x, y, action.first);
+      float alpha = 1.0 / (getVisits(x, y, action.first));
+      float old_q = getQValue(x, y, action.first);
+
+      float q_max = 0.0;
+
+      if (getType(new_x, new_y) != 'T') {
+        q_max = getMaxQValue(new_x, new_y);
+      } else {
+        q_max = getReward(new_x, new_y);
+      }
+
+      float new_q = getReward(x, y) + gamma * q_max;
+      float updated_q = old_q + alpha * (new_q - old_q);
+
+      updateQValue(x, y, action.first, updated_q);
+      q_max = getMaxQValue(x, y);
+      updateUtility(x, y, q_max);
+
+      x = new_x;
+      y = new_y;
+    }
+    printWorld();
+  }
+}
+
+std::pair<char, std::vector<std::array<int, 2>>> World::getRandomAction(int x,
+                                                                        int y) {
+  std::map<char, std::vector<std::array<int, 2>>> actions = {// UP
+                                                             {'^',
+                                                              {
+                                                                  {x - 1, y},
+                                                                  {x, y + 1},
+                                                                  {x + 1, y},
+                                                              }},
+                                                             // DOWN
+                                                             {'v',
+                                                              {
+                                                                  {x - 1, y},
+                                                                  {x, y - 1},
+                                                                  {x + 1, y},
+                                                              }},
+                                                             // LEFT
+                                                             {'<',
+                                                              {
+                                                                  {x, y - 1},
+                                                                  {x - 1, y},
+                                                                  {x, y + 1},
+                                                              }},
+                                                             // RIGHT
+                                                             {
+                                                                 '>',
+                                                                 {
+                                                                     {x, y - 1},
+                                                                     {x + 1, y},
+                                                                     {x, y + 1},
+                                                                 },
+                                                             }};
+
+  auto it = actions.begin();
+  std::advance(it, std::rand() % actions.size());
+  return *it;
+}
+
+std::pair<int, int> World::execute_action(int start_x, int start_y,
+                                          char action) {
+  auto x = start_x;
+  auto y = start_y;
+  if (action == '^') {
+    y += 1;
+  } else if (action == 'v') {
+    y -= 1;
+  } else if (action == '<') {
+    x -= 1;
+  } else if (action == '>') {
+    x += 1;
+  }
+  try{
+  if (getType(x, y) == 'F') {
+    return {start_x, start_y};
+  } else if (x >= 1 && x <= width && y >= 1 && y <= height) {
+    return {x, y};
+  } else {
+
+    return {start_x, start_y};
+  }
+  } catch (const std::out_of_range &e) {
+    return {start_x, start_y};
+  }
 }
