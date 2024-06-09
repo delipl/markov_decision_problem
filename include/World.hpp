@@ -38,7 +38,7 @@ public:
   float getReward(int x, int y) const;
   void addVisit(int x, int y, char action);
   uint32_t getVisits(int x, int y, char action) const;
-  void QLearning();
+  void QLearning(int start_x, int start_y, int &x, int& y);
 
   float getQValue(int x, int y, char action);
   void updateQValue(int x, int y, char action, float value);
@@ -56,6 +56,7 @@ private:
   bool startStateSet;
   float reward;
   float gamma;
+  float epsilon;
   float probabilities[3];
   void initializeGrid();
 

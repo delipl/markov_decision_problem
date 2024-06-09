@@ -1,7 +1,9 @@
 #include "World.hpp"
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <vector>
 
 World::World(const DataLoader &dataLoader) {
@@ -20,6 +22,7 @@ World::World(const DataLoader &dataLoader) {
   forbiddenStates = dataLoader.getForbiddenStates();
   gamma = dataLoader.getGamma();
   reward = dataLoader.getDefaultReward();
+  epsilon = dataLoader.getEpsilon();
   initializeGrid();
 
   auto probs = dataLoader.getProbabilities();
@@ -49,8 +52,16 @@ void World::initializeGrid() {
   }
 
   for (const auto &ss : specialStates) {
-    grid[ss.y - 1][ss.x - 1] = {ss.reward, '*', ss.reward,
-                                ' '}; // Special states can have specific values
+    grid[ss.y - 1][ss.x - 1] = {
+        ss.reward,
+        '*',
+        ss.reward,
+        ' ',
+        {{'^', 0}, {'v', 0}, {'<', 0}, {'>', 0}},
+        {{'^', 0.0},
+         {'v', 0.0},
+         {'<', 0.0},
+         {'>', 0.0}}}; // Special states can have specific values
   }
 
   for (const auto &fs : forbiddenStates) {
@@ -304,59 +315,53 @@ std::pair<int, int> World::getStart() {
   return {-1, -1};
 }
 
-void World::QLearning() {
+void World::QLearning(int start_x, int start_y, int &x, int& y ) {
 
-  for (int i = 0; i < 100; ++i) {
-    auto [start_x, start_y] = getStart();
-    int x = start_x;
-    int y = start_y;
-    std::cout << "Iteration " << i << std::endl;
-    while (getType(x, y) != 'T') {
-      auto action = getRandomAction(x, y);
-      // std::cout << "at (" << x << "," << y << ") " << std::endl;
-      auto [new_x, new_y] = execute_action(x, y, action.first);
-      // std::cout << "looking at (" << new_x << "," << new_y << ")" << std::endl;
+  while (getType(x, y) != 'T') {
+    auto action = getRandomAction(x, y);
+    // std::cout << "at (" << x << "," << y << ") " << std::endl;
+    auto [new_x, new_y] = execute_action(x, y, action.first);
+    // std::cout << "looking at (" << new_x << "," << new_y << ")" <<
+    // std::endl;
 
-      addVisit(x, y, action.first);
-      float alpha = 1.0 / (getVisits(x, y, action.first));
-      float old_q = getQValue(x, y, action.first);
+    addVisit(x, y, action.first);
+    float alpha = 1.0 / (getVisits(x, y, action.first));
+    float old_q = getQValue(x, y, action.first);
 
-      float q_max = 0.0;
+    float q_max = 0.0;
 
-      if (getType(new_x, new_y) != 'T') {
-        q_max = getMaxQValue(new_x, new_y);
-      } else {
-        q_max = getReward(new_x, new_y);
-      }
-
-      float new_q = getReward(x, y) + gamma * q_max;
-      float updated_q = old_q + alpha * (new_q - old_q);
-
-      updateQValue(x, y, action.first, updated_q);
-      q_max = getMaxQValue(x, y);
-      updateUtility(x, y, q_max);
-
-      x = new_x;
-      y = new_y;
+    if (getType(new_x, new_y) != 'T') {
+      q_max = getMaxQValue(new_x, new_y);
+    } else {
+      q_max = getReward(new_x, new_y);
     }
-    printWorld();
+
+    float new_q = getReward(x, y) + gamma * q_max;
+    float updated_q = old_q + alpha * (new_q - old_q);
+
+    updateQValue(x, y, action.first, updated_q);
+    q_max = getMaxQValue(x, y);
+    updateUtility(x, y, q_max);
+
+    x = new_x;
+    y = new_y;
   }
 }
 
 std::pair<char, std::vector<std::array<int, 2>>> World::getRandomAction(int x,
                                                                         int y) {
-  std::map<char, std::vector<std::array<int, 2>>> actions = {// UP
-                                                             {'^',
-                                                              {
-                                                                  {x - 1, y},
-                                                                  {x, y + 1},
-                                                                  {x + 1, y},
-                                                              }},
-                                                             // DOWN
+  std::map<char, std::vector<std::array<int, 2>>> actions = {// DOWN
                                                              {'v',
                                                               {
                                                                   {x - 1, y},
                                                                   {x, y - 1},
+                                                                  {x + 1, y},
+                                                              }},
+                                                             // UP
+                                                             {'^',
+                                                              {
+                                                                  {x - 1, y},
+                                                                  {x, y + 1},
                                                                   {x + 1, y},
                                                               }},
                                                              // LEFT
@@ -377,8 +382,30 @@ std::pair<char, std::vector<std::array<int, 2>>> World::getRandomAction(int x,
                                                              }};
 
   auto it = actions.begin();
-  std::advance(it, std::rand() % actions.size());
-  return *it;
+
+  std::mt19937_64 rng;
+  uint64_t timeSeed =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  std::seed_seq ss{uint32_t(timeSeed & 0xffffffff), uint32_t(timeSeed >> 32)};
+  rng.seed(ss);
+  std::uniform_real_distribution<double> unif(0, 1);
+  auto random = unif(rng);
+  auto policy = getPolicy(x, y);
+  std::cout << "epsilon: " << epsilon << " random: " << random << std::endl;
+  if (random < epsilon or policy == ' ') {
+    random = unif(rng);
+    if (random < 0.75) {
+      ++it;
+    }
+    if (random < 0.5) {
+      ++it;
+    }
+    if (random < 0.25) {
+      ++it;
+    }
+    return *it;
+  }
+  return {policy, actions[policy]};
 }
 
 std::pair<int, int> World::execute_action(int start_x, int start_y,
@@ -394,15 +421,15 @@ std::pair<int, int> World::execute_action(int start_x, int start_y,
   } else if (action == '>') {
     x += 1;
   }
-  try{
-  if (getType(x, y) == 'F') {
-    return {start_x, start_y};
-  } else if (x >= 1 && x <= width && y >= 1 && y <= height) {
-    return {x, y};
-  } else {
+  try {
+    if (getType(x, y) == 'F') {
+      return {start_x, start_y};
+    } else if (x >= 1 && x <= width && y >= 1 && y <= height) {
+      return {x, y};
+    } else {
 
-    return {start_x, start_y};
-  }
+      return {start_x, start_y};
+    }
   } catch (const std::out_of_range &e) {
     return {start_x, start_y};
   }
